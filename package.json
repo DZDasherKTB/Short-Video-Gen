@@ -38,7 +38,7 @@
     "node-fetch": "^3.3.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "remotion": "4.0.300",
+    "remotion": "^4.0.300",
     "replicate": "^1.0.1",
     "swr": "^2.3.0",
     "tailwind-merge": "^2.6.0",
