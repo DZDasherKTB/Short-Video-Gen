@@ -1,16 +1,13 @@
-'use client'
+"use client";
 
 import { UserProfile } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { redirect } from 'next/navigation';
 
-const ShowImagePage = () => {
-  
-  return (
-    <div>
-      <h1>Hello</h1>
-      <UserProfile/>
-    </div>
-  );
-};
+function ShowImagePage() {
+  redirect('/dashboard');
+  return null;
+}
+
 
 export default ShowImagePage;

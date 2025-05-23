@@ -9,6 +9,7 @@ export async function POST(req){
 
      return NextResponse.json({'result':JSON.parse(result.response.text())})
   } catch (error) {
+    console.log(error)
     return NextResponse.json({'Error':error.message})
   }
 }
