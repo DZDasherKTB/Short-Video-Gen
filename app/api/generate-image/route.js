@@ -47,8 +47,8 @@ export async function POST(request) {
       const { data: urlData } = await supabase.storage
         .from("ai-short-video-generator")
         .getPublicUrl(filePath);
-
-
+        console.log("Public URL:", urlData.publicUrl);
+      // Fix the URL if necessary
       return NextResponse.json({
         result: urlData.publicUrl, // Public URL of the uploaded image
       });
