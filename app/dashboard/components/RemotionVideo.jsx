@@ -1,77 +1,168 @@
-import React, { useState, useEffect } from "react";
-import { AbsoluteFill, Audio, Img, interpolate, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
+import React, { useEffect, useState } from "react";
+import {
+  AbsoluteFill,
+  Audio,
+  Img,
+  Sequence,
+  useCurrentFrame,
+  useVideoConfig,
+  interpolate,
+  Easing,
+  spring,
+  random as remotionRandom,
+} from "remotion";
 
 const RemotionVideo = ({ script, imageList, audioFileUrl, captions }) => {
-  const { fps } = useVideoConfig();
-  const frame = useCurrentFrame()
-  const [loadedAudioFileUrl, setLoadedAudioFileUrl] = useState(null); // State to store the loaded audio URL
+  const { fps, width, height } = useVideoConfig();
+  const frame = useCurrentFrame();
+  const [loadedAudioFileUrl, setLoadedAudioFileUrl] = useState(null);
 
-  // Get the duration in frames for each image sequence
+  useEffect(() => {
+    setLoadedAudioFileUrl(audioFileUrl || "https://example.com/default-audio.mp3");
+  }, [audioFileUrl]);
+
   const getDurationFrames = () => {
-    return (captions[captions?.length - 1]?.end * fps) / 1000;
+    if (!captions?.length) return 100;
+    return (captions.at(-1)?.end * fps) / 1000;
   };
 
-  // Fetch audio URL if not passed as a prop
-  useEffect(() => {
-    if (audioFileUrl) {
-      setLoadedAudioFileUrl(audioFileUrl); // Use the passed URL if available
-    } else {
-      setLoadedAudioFileUrl("https://example.com/default-audio.mp3"); // Use a default URL if not available
-    }
-  }, [audioFileUrl]); // Re-run if audioFileUrl changes
-  
-  const getCurrentCaptions=()=>{
-    const currentTime=frame/30*1000
-    const currentCaption = captions.find(word => currentTime >= word.start && currentTime <= word.end);
-    return currentCaption?currentCaption?.text:'';
-  }
+  const getCurrentCaption = () => {
+    if (!captions?.length) return "";
+    const ms = (frame / fps) * 1000;
+    return captions.find(w => ms >= w.start && ms <= w.end)?.text || "";
+  };
+
+  const totalDuration = getDurationFrames();
+  const framesPerImage = imageList?.length
+    ? Math.floor(totalDuration / imageList.length)
+    : 100;
+
+  const flip = (val) => (val > 0.5 ? 1 : -1);
 
   return (
-    <AbsoluteFill className="bg-black">
-      {imageList?.map((item, index) => 
-      
-      {
-        const startTime = (index * getDurationFrames()) / imageList?.length;
-        const duration = getDurationFrames()
-        
-        const scale =(index)=> interpolate(
-          frame,
-          [startTime,startTime+duration/2,startTime+duration],
-          index%2==0?[1,1.3,1]:[1.3,1,1.3],
-          {extrapolateLeft:'clamp',extrapolateRight:'clamp'}
-        )
-        
-        return (
-        <Sequence
-          key={index}
-          from={startTime}
-          durationInFrames={duration}
-        >
-          <AbsoluteFill
-            style={{ justifyContent: "center", alignItems: "center" }}
-          >
-            <Img
-              src={item}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                transform:`scale(${scale(index)})`
-              }}
-            />
-            <AbsoluteFill style={{color:'white',justifyContent:'center', top:undefined,bottom:50,height:150,textAlign:'center',width:'100%'}}>
-              <h2 className="text-2xl">{getCurrentCaptions()}</h2>
-            </AbsoluteFill>
-          </AbsoluteFill>
-        </Sequence>
-      )})}
+    <AbsoluteFill style={{ backgroundColor: "black" }}>
+      {imageList?.map((url, index) => {
+        const seed = `image-${index}`;
+        const rand1 = remotionRandom(`${seed}-1`);
+        const rand2 = remotionRandom(`${seed}-2`);
+        const rand3 = remotionRandom(`${seed}-3`);
 
-      {/* Render the Audio component if URL is available */}
-      {loadedAudioFileUrl && (
-        <Audio
-          src={loadedAudioFileUrl}
-        />
-      )}
+        const start = index * framesPerImage;
+        const end = start + framesPerImage;
+
+        const progress = interpolate(frame, [start, end], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        });
+
+        const easedProgress = Easing.bezier(0.3, 0.1, 0.3, 1)(progress);
+
+        // Zoom in/out direction alternates per image
+
+        const zoomDirection = index % 2 === 0 ? "in" : "out";
+        const baseZoom = 1.25; // Ensures the image always starts oversized
+        const finalZoom = 1.12; // Still zoomed in enough to cover canvas
+
+        const zoom = interpolate(
+          easedProgress,
+          [0, 1],
+          zoomDirection === "in" ? [finalZoom, baseZoom] : [baseZoom, finalZoom],
+          {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+          }
+        );
+
+
+        // Pan faster and slightly more
+        const maxPanX = ((width * 1.12) - width) / 2;
+        const maxPanY = ((height * 1.12) - height) / 2;
+
+        const panX = interpolate(easedProgress, [0, 1], [
+          flip(rand1) * rand2 * maxPanX * 0.8,
+          flip(rand3) * rand1 * maxPanX * 0.8,
+        ]);
+
+        const panY = interpolate(easedProgress, [0, 1], [
+          flip(rand2) * rand3 * maxPanY * 0.8,
+          flip(rand1) * rand2 * maxPanY * 0.8,
+        ]);
+
+        const rotate = interpolate(easedProgress, [0, 1], [rand1 * 4 - 2, 0]);
+        const skewX = interpolate(easedProgress, [0, 1], [0, rand2 * 4 - 2]);
+
+        const flash = spring({
+          frame: frame - start,
+          fps,
+          config: { damping: 14, stiffness: 150 },
+        });
+
+        const flashOpacity = index % 3 === 0
+          ? interpolate(flash, [0.9, 1], [0.3, 0], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            })
+          : 0;
+
+        return (
+          <Sequence key={index} from={start} durationInFrames={framesPerImage}>
+            <AbsoluteFill style={{ overflow: "hidden" }}>
+              <Img
+                src={url}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  transform: `
+                    scale(${zoom})
+                    translate(${panX}px, ${panY}px)
+                    rotateZ(${rotate}deg)
+                    skewX(${skewX}deg)
+                  `,
+                  transformOrigin: "center",
+                }}
+              />
+              {/* Flash effect */}
+              <AbsoluteFill
+                style={{
+                  backgroundColor: "white",
+                  opacity: flashOpacity,
+                  mixBlendMode: "overlay",
+                }}
+              />
+            </AbsoluteFill>
+          </Sequence>
+        );
+      })}
+
+      {/* Captions/Subtitles */}
+      <AbsoluteFill
+        style={{
+          justifyContent: "flex-end",
+          alignItems: "center",
+          paddingBottom: 60,
+          pointerEvents: "none",
+        }}
+      >
+        <div
+          style={{
+            background: "rgba(0,0,0,0.6)",
+            padding: "10px 20px",
+            borderRadius: 12,
+            maxWidth: "90%",
+            color: "white",
+            fontSize: 26,
+            fontWeight: 600,
+            textAlign: "center",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          {getCurrentCaption()}
+        </div>
+      </AbsoluteFill>
+
+      {/* Audio */}
+      {loadedAudioFileUrl && <Audio src={loadedAudioFileUrl} />}
     </AbsoluteFill>
   );
 };

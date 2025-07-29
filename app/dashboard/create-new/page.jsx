@@ -27,7 +27,9 @@ const createNew = () => {
   const [videoId,setVideoId]=useState()
   const {videoData,setVideoData}=useContext(VideoDataContext)
   const { userDetail, setUserDetail } = useContext(UserDetailContext);
-  
+  // e.g., 30 seconds / avg 3 seconds = ~10 scenes
+  const avgSceneDuration = 3; // seconds
+  const numScenes = Math.floor(formData.duration / avgSceneDuration);
   const {user}=useUser();
 
 
@@ -98,7 +100,21 @@ const createNew = () => {
   const GetVideoScript = async ()=> {
     setLoading(true)
 
-    const prompt = `Write a script to generate ${formData.duration} video on topic :Interesting ${formData.topic} along with Al image prompt in ${formData.imageStyle} format for each scene and give me result in JSON format with imagePrompt and Content Text as field`;
+    const prompt = `
+    Write a script to generate a ${formData.duration} second video on the topic: Interesting ${formData.topic}.
+    Divide the video into exactly ${numScenes} scenes — each scene should be around ${avgSceneDuration} seconds long.
+    Each scene must have:
+    - "content_text": 1–2 lines of narration
+    - "imagePrompt": vivid, descriptive visual prompt
+
+    Return the result in valid JSON with a key "video_script": [ ... ].
+    Each element should include:
+    - "scene"
+    - "duration" (in seconds)
+    - "content_text"
+    - "imagePrompt"
+    Only return valid JSON — no markdown or explanation.
+    `;
 
     try {
       const result = await fetch("/api/get-video-script", {
@@ -232,7 +248,7 @@ const createNew = () => {
         </button>
       </div>
       <CustomLoading loading={loading}/>
-      <PlayerDialog playVideo={playVideo} videoID={videoId}/>
+      <PlayerDialog playVideo={playVideo} videoID={videoId} onClose={() => window.location.reload()} />
     </div>
   );
 };
