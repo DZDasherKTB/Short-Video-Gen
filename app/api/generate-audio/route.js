@@ -10,11 +10,19 @@ export async function POST(req) {
   const { text, id } = await req.json();
 
   // Request setup for TTS
-  const request = {
-    input: { text: text },
-    voice: { languageCode: "en-US", ssmlGender: "FEMALE" },
-    audioConfig: { audioEncoding: "MP3" },
-  };
+const request = {
+  input: { text },
+  voice: {
+  languageCode: "en-US",
+  name: "en-US-Wavenet-B", // slower and neutral male voice
+},
+audioConfig: {
+  audioEncoding: "MP3",
+},
+};
+
+
+
 
   // Perform text-to-speech request
   const [response] = await client.synthesizeSpeech(request);

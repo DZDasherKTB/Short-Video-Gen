@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
   AbsoluteFill,
-  Audio,
   Img,
   Sequence,
   useCurrentFrame,
@@ -10,15 +9,24 @@ import {
   Easing,
   spring,
   random as remotionRandom,
+  Audio as RemotionAudio,
 } from "remotion";
+
 
 const RemotionVideo = ({ script, imageList, audioFileUrl, captions }) => {
   const { fps, width, height } = useVideoConfig();
   const frame = useCurrentFrame();
   const [loadedAudioFileUrl, setLoadedAudioFileUrl] = useState(null);
+  const [audioReady, setAudioReady] = useState(false);
 
   useEffect(() => {
-    setLoadedAudioFileUrl(audioFileUrl || "https://example.com/default-audio.mp3");
+    if (!audioFileUrl) return;
+
+    const audio = new Audio(audioFileUrl);
+    audio.onloadedmetadata = () => {
+      setAudioReady(true);
+    };
+    setLoadedAudioFileUrl(audioFileUrl);
   }, [audioFileUrl]);
 
   const getDurationFrames = () => {
@@ -57,11 +65,9 @@ const RemotionVideo = ({ script, imageList, audioFileUrl, captions }) => {
 
         const easedProgress = Easing.bezier(0.3, 0.1, 0.3, 1)(progress);
 
-        // Zoom in/out direction alternates per image
-
         const zoomDirection = index % 2 === 0 ? "in" : "out";
-        const baseZoom = 1.25; // Ensures the image always starts oversized
-        const finalZoom = 1.12; // Still zoomed in enough to cover canvas
+        const baseZoom = 1.25;
+        const finalZoom = 1.12;
 
         const zoom = interpolate(
           easedProgress,
@@ -73,9 +79,7 @@ const RemotionVideo = ({ script, imageList, audioFileUrl, captions }) => {
           }
         );
 
-
-        // Pan faster and slightly more
-        const maxPanX = ((width * 1.12) - width) / 2;
+         const maxPanX = ((width * 1.12) - width) / 2;
         const maxPanY = ((height * 1.12) - height) / 2;
 
         const panX = interpolate(easedProgress, [0, 1], [
@@ -122,7 +126,6 @@ const RemotionVideo = ({ script, imageList, audioFileUrl, captions }) => {
                   transformOrigin: "center",
                 }}
               />
-              {/* Flash effect */}
               <AbsoluteFill
                 style={{
                   backgroundColor: "white",
@@ -161,8 +164,8 @@ const RemotionVideo = ({ script, imageList, audioFileUrl, captions }) => {
         </div>
       </AbsoluteFill>
 
-      {/* Audio */}
-      {loadedAudioFileUrl && <Audio src={loadedAudioFileUrl} />}
+      {/* ✅ Audio plays only after metadata is loaded */}
+{audioReady && loadedAudioFileUrl && <RemotionAudio src={loadedAudioFileUrl} />}
     </AbsoluteFill>
   );
 };

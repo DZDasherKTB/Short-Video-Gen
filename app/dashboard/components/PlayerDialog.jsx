@@ -4,7 +4,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
 import { Player } from "@remotion/player";
@@ -17,50 +16,51 @@ import { useRouter } from "next/navigation";
 
 const PlayerDialog = ({ playVideo, videoID }) => {
   const [openDialog, setOpenDialog] = useState(false);
-  const [videoData, setVideoData] = useState();
-  const [durationInFrame, setDurationInFrame] = useState(100);
+  const [videoData, setVideoData] = useState(null);
+  const [durationInFrames, setDurationInFrames] = useState(null);
   const router = useRouter();
 
-  // Handle dialog open
   useEffect(() => {
-    if (playVideo) {
+    if (playVideo && videoID) {
       setOpenDialog(true);
-    }
-    if (videoID) {
       GetVideoData();
     }
   }, [playVideo, videoID]);
 
-  // Fetch video data
   const GetVideoData = async () => {
     const result = await db
       .select()
       .from(VideoData)
       .where(eq(VideoData.id, videoID));
-    setVideoData(result[0]);
+
+    const data = result[0];
+    setVideoData(data);
+
+    if (data?.audioFileUrl) {
+      const audio = new Audio(data.audioFileUrl);
+
+      const setDuration = () => {
+        const duration = audio.duration;
+        if (!isNaN(duration)) {
+          setDurationInFrames(Math.ceil(duration * 30)); // fps = 30
+        } else if (data?.captions?.length) {
+          const fallbackMs = data.captions.at(-1)?.end || 2000;
+          setDurationInFrames(Math.ceil((fallbackMs / 1000) * 30));
+        }
+      };
+
+      if (audio.readyState >= 1) {
+        setDuration(); // already loaded
+      } else {
+        audio.addEventListener("loadedmetadata", setDuration);
+      }
+    }
   };
 
-  // Update durationInFrame when videoData changes
-  useEffect(() => {
-    if (videoData?.captions) {
-      const duration = calculateDurationInFrames(videoData.captions, 30);
-      setDurationInFrame(duration);
-    }
-  }, [videoData]);
-
-  // Calculate frame duration
-  const calculateDurationInFrames = (captions, fps) => {
-    const lastCaptionEnd = captions[captions.length - 1]?.end;
-    if (lastCaptionEnd) {
-      return Math.round((lastCaptionEnd / 1000) * fps);
-    }
-    return 0;
-  };
-
-  // Handle close + reload
   const handleClose = () => {
     setOpenDialog(false);
-    router.refresh(); // soft reload to refetch state/UI
+    router.push("/");
+    router.refresh();
   };
 
   return (
@@ -72,28 +72,32 @@ const PlayerDialog = ({ playVideo, videoID }) => {
           </DialogTitle>
         </DialogHeader>
 
-        <Player
-          component={RemotionVideo}
-          durationInFrames={durationInFrame}
-          compositionWidth={300}
-          compositionHeight={450}
-          fps={30}
-          controls={true}
-          inputProps={{
-            ...videoData,
-          }}
-        />
+        {videoData && durationInFrames ? (
+          <Player
+            component={RemotionVideo}
+            durationInFrames={durationInFrames}
+            compositionWidth={300}
+            compositionHeight={450}
+            fps={30}
+            controls
+            inputProps={{ ...videoData }}
+          />
+        ) : (
+          <div className="text-gray-600 font-medium py-10">
+            Loading video preview...
+          </div>
+        )}
 
         <div className="flex flex-row justify-around mt-7 w-full">
           <DialogClose asChild>
             <button
               onClick={handleClose}
-              className="bg-violet-100 text-black p-2 pl-4 pr-4 rounded-xl hover:bg-violet-200"
+              className="bg-violet-100 text-black p-2 px-4 rounded-xl hover:bg-violet-200"
             >
               Cancel
             </button>
           </DialogClose>
-          <button className="bg-violet-600 text-white p-2 pl-4 pr-4 rounded-xl hover:bg-violet-700">
+          <button className="bg-violet-600 text-white p-2 px-4 rounded-xl hover:bg-violet-700">
             Export
           </button>
         </div>
